@@ -5,18 +5,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -27,16 +19,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.dp
 import com.tygris.joyer.elements.ControllerUI
-import com.tygris.joyer.elements.JoyButton
 import com.tygris.joyer.ui.theme.JoyerTheme
-import java.io.OutputStream
 import java.io.PrintWriter
 import java.net.Socket
+import java.util.concurrent.LinkedBlockingQueue
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,24 +43,55 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-fun sendPacket(ip: String, message: String){
-    Thread{
-        try {
-            val socket = Socket(ip, 8007);
-            val output: OutputStream = socket.getOutputStream();
-            val writer = PrintWriter(output, true);
+object ConnectionManager {
+    private var socket: Socket? = null
+    private var writer: PrintWriter? = null
+    private val queue = LinkedBlockingQueue<String>()
+    @Volatile private var currentIp: String? = null
 
-            writer.println(message + "\n");
-            writer.flush();
-            writer.close();
-            socket.close();
-        }
-        catch(e: Exception){
+    init {
+        Thread {
+            while (true) {
+                val msg = queue.take() // blocks until there's something to send
+                trySend(msg)
+            }
+        }.apply { isDaemon = true; start() }
+    }
+
+    fun enqueue(ip: String, message: String) {
+        if (ip != currentIp) reconnect(ip)
+        queue.offer(message)
+    }
+
+    private fun reconnect(ip: String) {
+        runCatching { socket?.close() }
+        currentIp = ip
+        socket = null
+        writer = null
+    }
+
+    private fun trySend(msg: String) {
+        try {
+            if (writer == null) {
+                val s = Socket(currentIp, 8007)
+                socket = s
+                writer = PrintWriter(s.getOutputStream(), true)
+            }
+            writer!!.println(msg)
+        } catch (e: Exception) {
             e.printStackTrace()
+            // drop the broken connection; next send will reconnect
+            runCatching { socket?.close() }
+            socket = null
+            writer = null
         }
-    }.start()
+    }
 }
 
+// Drop-in replacement — same signature, no behavior change needed in ControllerUI
+fun sendPacket(ip: String, message: String) {
+    ConnectionManager.enqueue(ip, message)
+}
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     var ipaddr by remember { mutableStateOf<String?>(null) }

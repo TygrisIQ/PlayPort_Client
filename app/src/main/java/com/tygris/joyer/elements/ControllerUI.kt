@@ -109,14 +109,12 @@ fun ControllerUI(ipaddr: String?) {
 
 @Composable
 fun VirtualStick(onMove: (Float, Float) -> Unit) {
-    val radius = 100f
+    val maxRadius = 60f  // how far the knob can travel
     var knobOffset by remember { mutableStateOf(Offset.Zero) }
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .width(200.dp)
-            .height(200.dp)
+        modifier = Modifier.width(200.dp).height(200.dp)
     ) {
         Canvas(modifier = Modifier
             .matchParentSize()
@@ -124,10 +122,14 @@ fun VirtualStick(onMove: (Float, Float) -> Unit) {
                 detectDragGestures(
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        knobOffset += dragAmount
-                        val normX = (knobOffset.x / radius).coerceIn(-1f, 1f)
-                        val normY = (knobOffset.y / radius).coerceIn(-1f, 1f)
-                        onMove(normX, normY)
+                        val raw = knobOffset + dragAmount
+                        // clamp to circle so knob never escapes visually
+                        knobOffset = if (raw.getDistance() <= maxRadius) raw
+                        else raw / raw.getDistance() * maxRadius
+                        onMove(
+                            (knobOffset.x / maxRadius).coerceIn(-1f, 1f),
+                            (knobOffset.y / maxRadius).coerceIn(-1f, 1f)
+                        )
                     },
                     onDragEnd = {
                         knobOffset = Offset.Zero
@@ -136,10 +138,10 @@ fun VirtualStick(onMove: (Float, Float) -> Unit) {
                 )
             }
         ) {
-            // outer circle
-            drawCircle(Color.Gray, radius = radius)
-            // knob
-            drawCircle(Color.DarkGray, radius = 40f, center = Offset(radius + knobOffset.x, radius + knobOffset.y))
+            val cx = size.width / 2   // use actual canvas center, not hardcoded radius
+            val cy = size.height / 2
+            drawCircle(Color.Gray, radius = 100f, center = Offset(cx, cy))
+            drawCircle(Color.DarkGray, radius = 40f, center = Offset(cx + knobOffset.x, cy + knobOffset.y))
         }
     }
 }
