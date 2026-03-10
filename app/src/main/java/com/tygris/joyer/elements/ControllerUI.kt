@@ -23,8 +23,28 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import com.tygris.joyer.sendPacket
+import com.tygris.joyer.sendAxis
+import com.tygris.joyer.sendButton
 
+private const val BTN_A:          Byte = 0x00
+private const val BTN_B:          Byte = 0x01
+private const val BTN_X:          Byte = 0x02
+private const val BTN_Y:          Byte = 0x03
+private const val BTN_LB:         Byte = 0x04
+private const val BTN_LB1:        Byte = 0x05
+private const val BTN_RB:         Byte = 0x06
+private const val BTN_RB1:        Byte = 0x07
+private const val BTN_DPAD_UP:    Byte = 0x08
+private const val BTN_DPAD_DOWN:  Byte = 0x09
+private const val BTN_DPAD_LEFT:  Byte = 0x0A
+private const val BTN_DPAD_RIGHT: Byte = 0x0B
+private const val BTN_SELECT:     Byte = 0x0C
+private const val BTN_START:      Byte = 0x0D
+
+private const val AXIS_LS_X: Byte = 0x00
+private const val AXIS_LS_Y: Byte = 0x01
+private const val AXIS_RS_X: Byte = 0x02
+private const val AXIS_RS_Y: Byte = 0x03
 
 @Composable
 fun ControllerUI(ipaddr: String?) {
@@ -33,74 +53,66 @@ fun ControllerUI(ipaddr: String?) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Top row: Start / Select
+        // Top row: shoulder buttons
         Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
             if (ipaddr != null) {
                 Column {
-                    JoyButton(text = "LB1", onPress = { sendPacket(ipaddr, "PR_LB1")}, onRelease = { sendPacket(ipaddr, "RE_LB1")})
-                    JoyButton(text = "LB", onPress = { sendPacket(ipaddr, "PR_LB")}, onRelease = { sendPacket(ipaddr, "RE_LB")})
-
+                    JoyButton(text = "LB1", onPress = { sendButton(ipaddr, BTN_LB1, true) }, onRelease = { sendButton(ipaddr, BTN_LB1, false) })
+                    JoyButton(text = "LB",  onPress = { sendButton(ipaddr, BTN_LB,  true) }, onRelease = { sendButton(ipaddr, BTN_LB,  false) })
                 }
                 Column {
-                    JoyButton(text = "RB1", onPress = { sendPacket(ipaddr, "PR_RB1")}, onRelease = { sendPacket(ipaddr, "RE_RB1")})
-                    JoyButton(text = "RB", onPress = { sendPacket(ipaddr, "PR_RB")}, onRelease = { sendPacket(ipaddr, "RE_RB")})
-
+                    JoyButton(text = "RB1", onPress = { sendButton(ipaddr, BTN_RB1, true) }, onRelease = { sendButton(ipaddr, BTN_RB1, false) })
+                    JoyButton(text = "RB",  onPress = { sendButton(ipaddr, BTN_RB,  true) }, onRelease = { sendButton(ipaddr, BTN_RB,  false) })
                 }
-
             }
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            // DPad
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (ipaddr != null) {
-                    JoyButton(text = "↑", onPress = { sendPacket(ipaddr, "PR_DPAD_UP")},
-                        onRelease = { sendPacket(ipaddr, "RE_DPAD_UP")})
+                    JoyButton(text = "↑", onPress = { sendButton(ipaddr, BTN_DPAD_UP,    true) }, onRelease = { sendButton(ipaddr, BTN_DPAD_UP,    false) })
                     Row {
-                        JoyButton(text = "←", onPress = { sendPacket(ipaddr, "PR_DPAD_LEFT")},
-                            onRelease = { sendPacket(ipaddr, "RE_DPAD_LEFT")})
+                        JoyButton(text = "←", onPress = { sendButton(ipaddr, BTN_DPAD_LEFT,  true) }, onRelease = { sendButton(ipaddr, BTN_DPAD_LEFT,  false) })
                         Spacer(Modifier.width(8.dp))
-                        JoyButton(text = "→", onPress = { sendPacket(ipaddr, "PR_DPAD_RIGHT")},
-                            onRelease = { sendPacket(ipaddr, "RE_DPAD_RIGHT")})
+                        JoyButton(text = "→", onPress = { sendButton(ipaddr, BTN_DPAD_RIGHT, true) }, onRelease = { sendButton(ipaddr, BTN_DPAD_RIGHT, false) })
                     }
-                    JoyButton(text = "↓", onPress = { sendPacket(ipaddr, "PR_DPAD_DOWN")}, onRelease = { sendPacket(ipaddr, "RE_DPAD_DOWN")})
+                    JoyButton(text = "↓", onPress = { sendButton(ipaddr, BTN_DPAD_DOWN,  true) }, onRelease = { sendButton(ipaddr, BTN_DPAD_DOWN,  false) })
                 }
             }
 
-            Row{
-                if(ipaddr != null){
-                    JoyButton(text = "START", onPress = { sendPacket(ipaddr, "PR_START")},
-                        onRelease = { sendPacket(ipaddr, "RE_START")})
-                    JoyButton(text = "SELECT", onPress = { sendPacket(ipaddr, "PR_SELECT")},
-                        onRelease = { sendPacket(ipaddr, "RE_SELECT")})
+            // Start / Select
+            Row {
+                if (ipaddr != null) {
+                    JoyButton(text = "START",  onPress = { sendButton(ipaddr, BTN_START,  true) }, onRelease = { sendButton(ipaddr, BTN_START,  false) })
+                    JoyButton(text = "SELECT", onPress = { sendButton(ipaddr, BTN_SELECT, true) }, onRelease = { sendButton(ipaddr, BTN_SELECT, false) })
                 }
             }
 
+            // Face buttons
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (ipaddr != null) {
-                    JoyButton(text = "Y", onPress = { sendPacket(ipaddr, "PR_Y")}, onRelease = { sendPacket(ipaddr, "RE_Y")})
+                    JoyButton(text = "Y", onPress = { sendButton(ipaddr, BTN_Y, true) }, onRelease = { sendButton(ipaddr, BTN_Y, false) })
                     Row {
-                        JoyButton(text = "X", onPress = { sendPacket(ipaddr, "PR_X")}, onRelease = { sendPacket(ipaddr, "RE_X")})
+                        JoyButton(text = "X", onPress = { sendButton(ipaddr, BTN_X, true) }, onRelease = { sendButton(ipaddr, BTN_X, false) })
                         Spacer(Modifier.width(8.dp))
-                        JoyButton(text = "B", onPress = { sendPacket(ipaddr, "PR_B")}, onRelease = { sendPacket(ipaddr, "RE_B")})
+                        JoyButton(text = "B", onPress = { sendButton(ipaddr, BTN_B, true) }, onRelease = { sendButton(ipaddr, BTN_B, false) })
                     }
-                    JoyButton(text = "A", onRelease = {sendPacket(ipaddr, "RE_A")}, onPress = { sendPacket(ipaddr, "PR_A")})
-//                    Button(onClick = { sendPacket(ipaddr, "A")}) {  Text("A")}
+                    JoyButton(text = "A", onPress = { sendButton(ipaddr, BTN_A, true) }, onRelease = { sendButton(ipaddr, BTN_A, false) })
                 }
             }
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly){
+
+        // Analog sticks
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             if (ipaddr != null) {
                 VirtualStick { dx, dy ->
-                    val xVal = (dx * 32767).toInt()
-                    val yVal = (dy * 32767).toInt()
-                    sendPacket(ipaddr, "LS:X:$xVal")
-                    sendPacket(ipaddr, "LS:Y:$yVal")
+                    sendAxis(ipaddr, AXIS_LS_X, (dx * 32767).toInt())
+                    sendAxis(ipaddr, AXIS_LS_Y, (dy * 32767).toInt())
                 }
                 VirtualStick { dx, dy ->
-                    val xVal = (dx * 32767).toInt()
-                    val yVal = (dy * 32767).toInt()
-                    sendPacket(ipaddr, "RS:X:$xVal")
-                    sendPacket(ipaddr, "RS:Y:$yVal")
+                    sendAxis(ipaddr, AXIS_RS_X, (dx * 32767).toInt())
+                    sendAxis(ipaddr, AXIS_RS_Y, (dy * 32767).toInt())
                 }
             }
         }
@@ -109,7 +121,7 @@ fun ControllerUI(ipaddr: String?) {
 
 @Composable
 fun VirtualStick(onMove: (Float, Float) -> Unit) {
-    val maxRadius = 60f  // how far the knob can travel
+    val maxRadius = 60f
     var knobOffset by remember { mutableStateOf(Offset.Zero) }
 
     Box(
@@ -123,7 +135,7 @@ fun VirtualStick(onMove: (Float, Float) -> Unit) {
                     onDrag = { change, dragAmount ->
                         change.consume()
                         val raw = knobOffset + dragAmount
-                        // clamp to circle so knob never escapes visually
+                        // clamp knob visually to circle boundary
                         knobOffset = if (raw.getDistance() <= maxRadius) raw
                         else raw / raw.getDistance() * maxRadius
                         onMove(
@@ -138,7 +150,7 @@ fun VirtualStick(onMove: (Float, Float) -> Unit) {
                 )
             }
         ) {
-            val cx = size.width / 2   // use actual canvas center, not hardcoded radius
+            val cx = size.width / 2
             val cy = size.height / 2
             drawCircle(Color.Gray, radius = 100f, center = Offset(cx, cy))
             drawCircle(Color.DarkGray, radius = 40f, center = Offset(cx + knobOffset.x, cy + knobOffset.y))

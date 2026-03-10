@@ -24,6 +24,10 @@ import com.tygris.joyer.ui.theme.JoyerTheme
 import java.io.PrintWriter
 import java.net.Socket
 import java.util.concurrent.LinkedBlockingQueue
+private const val PRESS:   Byte = 0x01
+private const val RELEASE: Byte = 0x02
+private const val AXIS:    Byte = 0x03
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,56 +46,79 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
 object ConnectionManager {
     private var socket: Socket? = null
-    private var writer: PrintWriter? = null
-    private val queue = LinkedBlockingQueue<String>()
+    private var outputStream: java.io.OutputStream? = null
+    private val queue = LinkedBlockingQueue<ByteArray>()
     @Volatile private var currentIp: String? = null
 
     init {
         Thread {
             while (true) {
-                val msg = queue.take() // blocks until there's something to send
-                trySend(msg)
+                val packet = queue.take()
+                trySend(packet)
             }
         }.apply { isDaemon = true; start() }
     }
 
-    fun enqueue(ip: String, message: String) {
+    fun enqueue(ip: String, packet: ByteArray) {
         if (ip != currentIp) reconnect(ip)
-        queue.offer(message)
+        queue.offer(packet)
+    }
+
+    // Release events skip the queue entirely and send on their own thread
+    // so a backed-up queue of axis events can't delay a button release
+    fun enqueuePriority(ip: String, packet: ByteArray) {
+        if (ip != currentIp) reconnect(ip)
+        Thread {
+            trySend(packet)
+        }.start()
     }
 
     private fun reconnect(ip: String) {
         runCatching { socket?.close() }
         currentIp = ip
         socket = null
-        writer = null
+        outputStream = null
     }
 
-    private fun trySend(msg: String) {
+    private fun trySend(packet: ByteArray) {
         try {
-            if (writer == null) {
+            if (outputStream == null) {
                 val s = Socket(currentIp, 8007)
                 socket = s
-                writer = PrintWriter(s.getOutputStream(), true)
+                outputStream = s.getOutputStream()
             }
-            writer!!.println(msg)
+            outputStream!!.write(packet + byteArrayOf(0x0A))
+            outputStream!!.flush()
         } catch (e: Exception) {
             e.printStackTrace()
-            // drop the broken connection; next send will reconnect
             runCatching { socket?.close() }
             socket = null
-            writer = null
+            outputStream = null
         }
     }
 }
 
-// Drop-in replacement — same signature, no behavior change needed in ControllerUI
-fun sendPacket(ip: String, message: String) {
-    ConnectionManager.enqueue(ip, message)
+fun sendButton(ip: String, btn: Byte, pressing: Boolean) {
+    val packet = byteArrayOf(if (pressing) PRESS else RELEASE, btn)
+    if (pressing) {
+        ConnectionManager.enqueue(ip, packet)
+    } else {
+        // releases are priority — they must never get stuck behind axis spam
+        ConnectionManager.enqueuePriority(ip, packet)
+    }
 }
+
+fun sendAxis(ip: String, axisId: Byte, value: Int) {
+    val v = value.toShort()
+    val lo = (v.toInt() and 0xFF).toByte()
+    val hi = ((v.toInt() shr 8) and 0xFF).toByte()
+    ConnectionManager.enqueue(ip, byteArrayOf(AXIS, axisId, lo, hi))
+}
+//fun sendPacket(ip: String, message: String) {
+//    ConnectionManager.enqueue(ip, message)
+//}
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     var ipaddr by remember { mutableStateOf<String?>(null) }
