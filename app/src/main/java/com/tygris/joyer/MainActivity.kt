@@ -24,6 +24,17 @@ import com.tygris.joyer.ui.theme.JoyerTheme
 import java.io.PrintWriter
 import java.net.Socket
 import java.util.concurrent.LinkedBlockingQueue
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+
 private const val PRESS:   Byte = 0x01
 private const val RELEASE: Byte = 0x02
 private const val AXIS:    Byte = 0x03
@@ -46,6 +57,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+//singleton managing all connection and packet sending business
 object ConnectionManager {
     private var socket: Socket? = null
     private var outputStream: java.io.OutputStream? = null
@@ -122,17 +135,79 @@ fun sendAxis(ip: String, axisId: Byte, value: Int) {
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     var ipaddr by remember { mutableStateOf<String?>(null) }
-    Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+    var manualIp by remember { mutableStateOf("") }
+    var showManual by remember { mutableStateOf(false) }
+    var connecting by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    fun tryConnect(ip: String) {
+        connecting = true
+        error = null
+        Thread {
+            try {
+                val socket = Socket()
+                socket.connect(java.net.InetSocketAddress(ip, 8007), 3000) // 3 second timeout
+                socket.close()
+                ipaddr = ip
+            } catch (e: Exception) {
+                error = "Could not connect to $ip"
+            } finally {
+                connecting = false
+            }
+        }.start()
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
         if (ipaddr == null) {
-            Button(onClick = { discoverServer() { ip -> ipaddr = ip } }) {
-                Text("SEARCH FOR SERVER!")
+            Button(
+                onClick = { discoverServer() { ip -> tryConnect(ip) } },
+                enabled = !connecting
+            ) {
+                Text(if (connecting) "Connecting..." else "SEARCH FOR SERVER")
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            if (!showManual) {
+                TextButton(onClick = { showManual = true }) {
+                    Text("Enter IP manually")
+                }
+            } else {
+                OutlinedTextField(
+                    value = manualIp,
+                    onValueChange = { manualIp = it; error = null },
+                    label = { Text("Server IP") },
+                    placeholder = { Text("192.168.1.x") },
+                    singleLine = true,
+                    isError = error != null,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { if (manualIp.isNotBlank()) tryConnect(manualIp) }
+                    )
+                )
+                if (error != null) {
+                    Text(error!!, color = Color.Red)
+                }
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = { if (manualIp.isNotBlank()) tryConnect(manualIp) },
+                    enabled = !connecting && manualIp.isNotBlank()
+                ) {
+                    Text(if (connecting) "Connecting..." else "Connect")
+                }
             }
         } else {
             Text("SERVER: $ipaddr")
             ControllerUI(ipaddr)
         }
     }
-
 }
 
 

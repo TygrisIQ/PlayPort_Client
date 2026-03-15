@@ -1,32 +1,49 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
+val localProps = Properties()
+rootProject.file("local.properties").inputStream().use { localProps.load(it) }
+
 android {
     namespace = "com.tygris.joyer"
     compileSdk = 36
+
+    signingConfigs {
+        create("release") {
+            storeFile = file(localProps["STORE_FILE"] as String)
+            storePassword = localProps["STORE_PASSWORD"] as String
+            keyAlias = localProps["KEY_ALIAS"] as String
+            keyPassword = localProps["KEY_PASSWORD"] as String
+        }
+    }
 
     defaultConfig {
         applicationId = "com.tygris.joyer"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
-
+        versionCode = 2
+        versionName = "1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -40,7 +57,6 @@ android {
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
